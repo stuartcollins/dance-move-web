@@ -1,0 +1,164 @@
+// Dance Journal - Database Schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "sqlite"
+}
+
+// User accounts
+model User {
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  passwordHash  String?
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Profile settings
+  isPublic      Boolean   @default(false)
+
+  // Relations
+  moves         Move[]
+  sessions      Session[]
+  accounts      Account[]
+}
+
+// OAuth accounts (for NextAuth)
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+// Sessions (for NextAuth)
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// Dance styles (West Coast Swing, Lindy Hop, Tango, etc.)
+model DanceStyle {
+  id             String          @id @default(cuid())
+  name           String          @unique
+  description    String?
+  moves          Move[]
+  universalMoves UniversalMove[]
+}
+
+// Universal moves - the complete universe of known moves (from LLM/crawling)
+model UniversalMove {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  tier        Int      @default(2) // 1-4 difficulty level
+  category    String   @default("partnered") // "solo" or "partnered"
+  aliases     String?  // Comma-separated alternative names
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  danceStyleId String
+  danceStyle   DanceStyle @relation(fields: [danceStyleId], references: [id])
+
+  // Self-referencing relations for move relationships
+  relatedFrom UniversalMoveRelation[] @relation("UniversalFromMove")
+  relatedTo   UniversalMoveRelation[] @relation("UniversalToMove")
+
+  @@unique([name, danceStyleId])
+  @@index([danceStyleId])
+}
+
+// Relationships between universal moves with weights
+model UniversalMoveRelation {
+  id           String  @id @default(cuid())
+  weight       Float   @default(0.5) // 0-1, strength of relationship
+  relationType String  @default("related") // "prerequisite", "related", "variation", "leads_to"
+
+  fromMoveId String
+  fromMove   UniversalMove @relation("UniversalFromMove", fields: [fromMoveId], references: [id], onDelete: Cascade)
+
+  toMoveId String
+  toMove   UniversalMove @relation("UniversalToMove", fields: [toMoveId], references: [id], onDelete: Cascade)
+
+  @@unique([fromMoveId, toMoveId])
+  @@index([fromMoveId])
+  @@index([toMoveId])
+}
+
+// Dance moves
+model Move {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  tier        Int      @default(1)  // 1-4 difficulty level
+  notes       String?  // Personal notes about the move
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  userId      String
+  user        User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  danceStyleId String
+  danceStyle   DanceStyle @relation(fields: [danceStyleId], references: [id])
+
+  videos      Video[]
+
+  // Self-referencing relations for move relationships
+  relatedFrom MoveRelation[] @relation("FromMove")
+  relatedTo   MoveRelation[] @relation("ToMove")
+
+  @@index([userId])
+  @@index([danceStyleId])
+}
+
+// Videos linked to moves
+model Video {
+  id          String   @id @default(cuid())
+  url         String   // YouTube URL
+  title       String?
+  description String?
+  createdAt   DateTime @default(now())
+
+  moveId      String
+  move        Move     @relation(fields: [moveId], references: [id], onDelete: Cascade)
+
+  @@index([moveId])
+}
+
+// Relationships between moves
+model MoveRelation {
+  id           String   @id @default(cuid())
+  relationType String   // "prerequisite", "related", "variation"
+  notes        String?
+
+  fromMoveId   String
+  fromMove     Move     @relation("FromMove", fields: [fromMoveId], references: [id], onDelete: Cascade)
+
+  toMoveId     String
+  toMove       Move     @relation("ToMove", fields: [toMoveId], references: [id], onDelete: Cascade)
+
+  @@unique([fromMoveId, toMoveId, relationType])
+  @@index([fromMoveId])
+  @@index([toMoveId])
+}
