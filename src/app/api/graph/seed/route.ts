@@ -10,6 +10,139 @@ interface MoveData {
   relatedMoves: { name: string; weight: number; type: string }[]
 }
 
+type MoveFamily = 'core_lindy' | 'charleston' | 'jazz_styling' | 'aerials_specials'
+
+// Determine the family for a move based on its name and characteristics
+function getMoveFamily(name: string, category: string): MoveFamily {
+  const nameLower = name.toLowerCase()
+
+  // Aerials and specials
+  if (nameLower.includes('aerial') || nameLower.includes('air step') ||
+      nameLower.includes('dip') || nameLower.includes('drop') ||
+      nameLower.includes('kip') || nameLower.includes('side car') ||
+      nameLower.includes('frankie throw') || nameLower.includes('lift')) {
+    return 'aerials_specials'
+  }
+
+  // Charleston family - anything with charleston in the name or tandem
+  if (nameLower.includes('charleston') || nameLower.includes('tandem') ||
+      nameLower.includes('side-by-side') || nameLower.includes('hand-to-hand')) {
+    return 'charleston'
+  }
+
+  // Jazz/Styling - solo jazz steps and routines
+  const jazzMoves = [
+    'suzie q', 'truckin', 'shorty george', 'boogie', 'tacky annie',
+    'shim sham', 'big apple', 'tranky doo', 'jitterbug stroll', 'first stops',
+    'fall off the log', 'apple jacks', 'knee slaps', 'crazy legs', 'rubber legs',
+    'break-a-leg', 'fishtail', 'rusty dusty', 'peckin', 'spank the baby',
+    'gaze afar', 'freeze', 'snake hips', 'mess around', 'itch', 'scratch',
+    'shout', 'praise allah', 'lock turn', 'flying home', 'grinds',
+    'crossovers', 'johnny\'s drop', 'heel rock', 'ba dum', 'jazz walk',
+    'strut', 'camel walk', 'pimp walk', 'savoy kicks', 'eagle slide',
+    'scarecrow', 'tick tock', 'skip up', 'bells', 'scissors'
+  ]
+  if (jazzMoves.some(jazz => nameLower.includes(jazz)) ||
+      (category === 'solo' && !nameLower.includes('charleston'))) {
+    return 'jazz_styling'
+  }
+
+  // Everything else is core Lindy
+  return 'core_lindy'
+}
+
+// Option 1: Movement Family - categorize by core movement pattern/mechanic
+type MovementFamily = 'swingout' | 'charleston' | 'turns' | 'jazz_styling' | 'fundamentals'
+
+function getMovementFamily(name: string, category: string): MovementFamily {
+  const n = name.toLowerCase()
+
+  // Fundamentals - building blocks
+  if (['rock step', 'triple step', 'pulse', 'connection', 'frame',
+       'closed position', 'open position', '6-count basic', '8-count basic',
+       'bounce', 'kick ball change'].some(f => n === f)) {
+    return 'fundamentals'
+  }
+
+  // Swingout family - core Lindy patterns built around the swingout
+  if (n.includes('swingout') || n.includes('swing out') || n.includes('lindy circle') ||
+      n.includes('send out') || n.includes('bring in') || n.includes('pass by') ||
+      n.includes('tuck turn') || n.includes('underarm turn') || n.includes('sugar push') ||
+      n.includes('basket whip') || n.includes('cuddle') || n.includes('promenade') ||
+      n.includes('pecks') || n.includes('frankie 6') || n.includes('hammerlock') ||
+      n.includes('texas tommy') || n.includes('sliding door') || n.includes('revolving door') ||
+      n.includes('trebuchet') || n.includes('cross-body') || n.includes('toss across') ||
+      n.includes('liquid') || n.includes('lift and slide') || n.includes('cross and lunge') ||
+      n.includes('foot sweep') || n.includes('kick away') || n.includes('stop on 5') ||
+      n.includes('swingout kate') || n.includes('california routine') ||
+      n === 'savoy swingout' || n === 'hollywood swingout') {
+    return 'swingout'
+  }
+
+  // Charleston family
+  if (n.includes('charleston') || n.includes('tandem') || n.includes('side-by-side') ||
+      n.includes('hand-to-hand') || n.includes('jockey') || n.includes('skip up') ||
+      n.includes('flip flop') || n.includes('airplane')) {
+    return 'charleston'
+  }
+
+  // Turns family - rotational movements
+  if (n.includes('turn') || n.includes('spin') || n.includes('loop') ||
+      n.includes('free spin') || n.includes('swivel') || n.includes('switch')) {
+    return 'turns'
+  }
+
+  // Jazz/Styling - solo expression
+  if (category === 'solo') {
+    return 'jazz_styling'
+  }
+
+  // Aerials/dips/drops -> swingout family (they're partnered specials)
+  if (n.includes('aerial') || n.includes('dip') || n.includes('drop') ||
+      n.includes('kip') || n.includes('side car') || n.includes('frankie throw')) {
+    return 'swingout'
+  }
+
+  return 'swingout' // default for remaining partnered moves
+}
+
+// Option 2: Position/Frame - categorize by physical relationship between partners
+type PositionFrame = 'closed' | 'open' | 'tandem' | 'side_by_side' | 'solo'
+
+function getPositionFrame(name: string, category: string): PositionFrame {
+  const n = name.toLowerCase()
+
+  // Solo - no partner connection required
+  if (category === 'solo') {
+    return 'solo'
+  }
+
+  // Tandem/Shadow - same direction, leader behind or beside
+  if (n.includes('tandem') || n.includes('airplane') || n.includes('shadow') ||
+      n.includes('cuddle') || n.includes('promenade')) {
+    return 'tandem'
+  }
+
+  // Side-by-side - partners facing same direction, connected
+  if (n.includes('side-by-side') || n.includes('hand-to-hand') ||
+      n.includes('jockey')) {
+    return 'side_by_side'
+  }
+
+  // Closed position moves
+  if (n.includes('closed') || n.includes('lindy circle') ||
+      n.includes('swingout from closed') || n === 'frame' ||
+      n === 'connection' || n === 'pulse' ||
+      n.includes('basket whip') || n.includes('pecks') ||
+      n.includes('liquid') || n.includes('stop on 5')) {
+    return 'closed'
+  }
+
+  // Open position moves - most partnered moves default here
+  // Includes: send out, pass by, tuck turn, turns, aerials, etc.
+  return 'open'
+}
+
 // Comprehensive Lindy Hop move dataset - 150 moves
 // category: "solo" = individual styling/jazz steps (red), "partnered" = partner work (blue)
 const lindyHopMoveData: MoveData[] = [
@@ -1449,12 +1582,18 @@ export async function POST() {
 
     for (const move of lindyHopMoveData) {
       try {
+        const family = getMoveFamily(move.name, move.category)
+        const movementFamily = getMovementFamily(move.name, move.category)
+        const positionFrame = getPositionFrame(move.name, move.category)
         const created = await prisma.universalMove.create({
           data: {
             name: move.name,
             description: move.description,
             tier: move.tier,
             category: move.category,
+            family: family,
+            movementFamily: movementFamily,
+            positionFrame: positionFrame,
             aliases: move.aliases?.join(', ') || null,
             danceStyleId: danceStyle.id,
           }

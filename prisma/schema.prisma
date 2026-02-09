@@ -73,6 +73,9 @@ model UniversalMove {
   description String?
   tier        Int      @default(2) // 1-4 difficulty level
   category    String   @default("partnered") // "solo" or "partnered"
+  family      String   @default("core_lindy") // Option 4: "core_lindy", "charleston", "jazz_styling", "aerials_specials"
+  movementFamily String @default("fundamentals") // Option 1: "swingout", "charleston", "turns", "jazz_styling", "fundamentals"
+  positionFrame  String @default("open")         // Option 2: "closed", "open", "tandem", "side_by_side", "solo"
   aliases     String?  // Comma-separated alternative names
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
