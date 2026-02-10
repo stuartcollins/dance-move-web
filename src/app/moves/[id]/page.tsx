@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import { AppShell } from '@/components/AppShell'
-import { prisma } from '@/lib/prisma'
+import { getPrisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
@@ -10,6 +10,7 @@ interface PageProps {
 }
 
 async function getMove(id: string) {
+  const prisma = await getPrisma()
   const move = await prisma.move.findUnique({
     where: { id },
     include: {

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { getPrisma } from '@/lib/prisma'
 
 interface RouteParams {
   params: Promise<{ id: string }>
@@ -7,6 +7,7 @@ interface RouteParams {
 
 export async function DELETE(request: Request, { params }: RouteParams) {
   try {
+    const prisma = await getPrisma()
     const { id } = await params
 
     await prisma.video.delete({

@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { getPrisma } from '@/lib/prisma'
 
 // Temporary: Get or create a demo user until auth is set up
 async function getDemoUser() {
+  const prisma = await getPrisma()
   let user = await prisma.user.findUnique({
     where: { email: 'demo@dancejournal.app' }
   })
@@ -21,6 +22,7 @@ async function getDemoUser() {
 
 // Get or create West Coast Swing dance style
 async function getDefaultDanceStyle() {
+  const prisma = await getPrisma()
   let style = await prisma.danceStyle.findUnique({
     where: { name: 'West Coast Swing' }
   })
@@ -74,6 +76,7 @@ export async function POST(request: Request) {
       })
     }
 
+    const prisma = await getPrisma()
     const move = await prisma.move.create({
       data: {
         name: name.trim(),
@@ -105,6 +108,7 @@ export async function POST(request: Request) {
 
 export async function GET() {
   try {
+    const prisma = await getPrisma()
     const moves = await prisma.move.findMany({
       include: {
         danceStyle: true,

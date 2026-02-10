@@ -1,10 +1,11 @@
 import Link from 'next/link'
 import { AppShell } from '@/components/AppShell'
-import { prisma } from '@/lib/prisma'
+import { getPrisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
 
 async function getMoves(danceStyleName: string) {
+  const prisma = await getPrisma()
   const moves = await prisma.move.findMany({
     where: {
       danceStyle: {
@@ -24,6 +25,7 @@ async function getMoves(danceStyleName: string) {
 }
 
 async function getDanceStyles() {
+  const prisma = await getPrisma()
   return prisma.danceStyle.findMany({
     orderBy: { name: 'asc' },
   })

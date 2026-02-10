@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { getPrisma } from '@/lib/prisma'
 
 interface MoveData {
   name: string
@@ -1553,6 +1553,7 @@ const lindyHopMoveData: MoveData[] = [
 
 export async function POST() {
   try {
+    const prisma = await getPrisma()
     // Get or create the Lindy Hop dance style
     let danceStyle = await prisma.danceStyle.findUnique({
       where: { name: 'Lindy Hop' }
@@ -1648,6 +1649,7 @@ export async function POST() {
 
 export async function GET() {
   try {
+    const prisma = await getPrisma()
     let danceStyle = await prisma.danceStyle.findUnique({
       where: { name: 'Lindy Hop' }
     })
