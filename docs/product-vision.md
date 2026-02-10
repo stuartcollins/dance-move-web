@@ -79,7 +79,6 @@ See `CLAUDE.md` for current technical state of the graph visualization.
 - Email notifications
 - Payments
 - Marketing features
-- Multiple dance styles (Lindy Hop only for MVP)
 
 ## Open Questions
 - Production database: Keep SQLite or migrate to PostgreSQL/Supabase?

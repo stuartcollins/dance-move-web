@@ -10,14 +10,27 @@ const ForceGraph2D = dynamic(() => import('react-force-graph-2d'), {
   loading: () => <div className="flex items-center justify-center h-96"><p>Loading graph...</p></div>
 })
 
-// Option 4: Hybrid families
-type MoveFamily = 'core_lindy' | 'charleston' | 'jazz_styling' | 'aerials_specials'
-// Option 1: Movement families
-type MovementFamily = 'swingout' | 'charleston' | 'turns' | 'jazz_styling' | 'fundamentals'
-// Option 2: Position/Frame
-type PositionFrame = 'closed' | 'open' | 'tandem' | 'side_by_side' | 'solo'
+// ─── Types from API response ───
 
-type CategorizationScheme = 'hybrid' | 'movement' | 'position'
+interface StyleMeta {
+  name: string
+  slug: string
+  description: string
+  moveCount: number
+}
+
+interface StyleGroup {
+  position: number
+  color: { base: string; light: string }
+  label: string
+}
+
+interface SchemeConfig {
+  label: string
+  description: string
+  nodeKey: 'family' | 'movementFamily' | 'positionFrame'
+  groups: Record<string, StyleGroup>
+}
 
 interface UniversalMove {
   id: string
@@ -25,9 +38,9 @@ interface UniversalMove {
   description: string | null
   tier: number
   category: 'solo' | 'partnered'
-  family: MoveFamily
-  movementFamily: MovementFamily
-  positionFrame: PositionFrame
+  family: string
+  movementFamily: string
+  positionFrame: string
   relatedFrom: { toMove: { id: string; name: string }; weight: number; relationType: string }[]
   relatedTo: { fromMove: { id: string; name: string }; weight: number; relationType: string }[]
 }
@@ -41,19 +54,16 @@ interface GraphNode {
   id: string
   name: string
   tier: number
-  category: 'solo' | 'partnered'
-  family: MoveFamily
-  movementFamily: MovementFamily
-  positionFrame: PositionFrame
+  category: string
+  classifications: Record<string, string> // family, movementFamily, positionFrame
   description: string | null
   learned: boolean
-  // Positioning
   x?: number
   y?: number
-  fx?: number // Fixed x position (locks horizontal position)
-  fy?: number // Fixed y position (locks vertical position)
+  fx?: number
+  fy?: number
   isVariation?: boolean
-  parentId?: string // ID of parent node if this is a variation
+  parentId?: string
 }
 
 interface GraphLink {
@@ -70,12 +80,12 @@ interface GraphData {
 
 // Force tuning parameters
 interface ForceParams {
-  tierStrength: number      // How strongly nodes stick to their tier (0-1)
-  variationStrength: number // How strongly variations stick near parent (0-1)
-  chargeStrength: number    // Repulsion between nodes (negative = repel)
-  familyStrength: number    // How strongly nodes separate by family (0-1)
-  linkDistance: number      // Distance between linked nodes
-  linkStrength: number      // How strongly links pull nodes together (0-1)
+  tierStrength: number
+  variationStrength: number
+  chargeStrength: number
+  familyStrength: number
+  linkDistance: number
+  linkStrength: number
 }
 
 const defaultForceParams: ForceParams = {
@@ -87,95 +97,6 @@ const defaultForceParams: ForceParams = {
   linkStrength: 0.3,
 }
 
-// === Categorization Scheme Configurations ===
-
-interface SchemeConfig {
-  label: string
-  description: string
-  positions: Record<string, number>
-  colors: Record<string, { base: string; light: string }>
-  labels: Record<string, string>
-  nodeKey: 'family' | 'movementFamily' | 'positionFrame'
-}
-
-const schemeConfigs: Record<CategorizationScheme, SchemeConfig> = {
-  hybrid: {
-    label: 'Hybrid',
-    description: '4 practical groups',
-    positions: {
-      'jazz_styling': 0.15,
-      'charleston': 0.4,
-      'core_lindy': 0.65,
-      'aerials_specials': 0.9,
-    },
-    colors: {
-      'jazz_styling': { base: '#f59e0b', light: '#fcd34d' },
-      'charleston': { base: '#10b981', light: '#6ee7b7' },
-      'core_lindy': { base: '#3b82f6', light: '#93c5fd' },
-      'aerials_specials': { base: '#8b5cf6', light: '#c4b5fd' },
-    },
-    labels: {
-      'jazz_styling': 'Jazz/Styling',
-      'charleston': 'Charleston',
-      'core_lindy': 'Core Lindy',
-      'aerials_specials': 'Aerials/Specials',
-    },
-    nodeKey: 'family',
-  },
-  movement: {
-    label: 'Movement Family',
-    description: '5 mechanic groups',
-    positions: {
-      'fundamentals': 0.1,
-      'swingout': 0.3,
-      'turns': 0.5,
-      'charleston': 0.7,
-      'jazz_styling': 0.9,
-    },
-    colors: {
-      'fundamentals': { base: '#ef4444', light: '#fca5a5' },
-      'swingout': { base: '#3b82f6', light: '#93c5fd' },
-      'turns': { base: '#8b5cf6', light: '#c4b5fd' },
-      'charleston': { base: '#10b981', light: '#6ee7b7' },
-      'jazz_styling': { base: '#f59e0b', light: '#fcd34d' },
-    },
-    labels: {
-      'fundamentals': 'Fundamentals',
-      'swingout': 'Swingout',
-      'turns': 'Turns',
-      'charleston': 'Charleston',
-      'jazz_styling': 'Jazz/Styling',
-    },
-    nodeKey: 'movementFamily',
-  },
-  position: {
-    label: 'Position/Frame',
-    description: '5 position groups',
-    positions: {
-      'closed': 0.1,
-      'open': 0.3,
-      'tandem': 0.5,
-      'side_by_side': 0.7,
-      'solo': 0.9,
-    },
-    colors: {
-      'closed': { base: '#ef4444', light: '#fca5a5' },
-      'open': { base: '#3b82f6', light: '#93c5fd' },
-      'tandem': { base: '#10b981', light: '#6ee7b7' },
-      'side_by_side': { base: '#f59e0b', light: '#fcd34d' },
-      'solo': { base: '#8b5cf6', light: '#c4b5fd' },
-    },
-    labels: {
-      'closed': 'Closed',
-      'open': 'Open',
-      'tandem': 'Tandem/Shadow',
-      'side_by_side': 'Side-by-Side',
-      'solo': 'Solo',
-    },
-    nodeKey: 'positionFrame',
-  },
-}
-
 export default function GraphPage() {
   const [graphData, setGraphData] = useState<GraphData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -183,26 +104,52 @@ export default function GraphPage() {
   const [error, setError] = useState<string | null>(null)
   const [selectedNode, setSelectedNode] = useState<GraphNode | null>(null)
   const [showControls, setShowControls] = useState(false)
-  const [activeScheme, setActiveScheme] = useState<CategorizationScheme>('hybrid')
   const [forceParams, setForceParams] = useState<ForceParams>(defaultForceParams)
   const [markingMode, setMarkingMode] = useState(false)
-  const [learnedMoveMap, setLearnedMoveMap] = useState<Map<string, string>>(new Map()) // lowercaseName → userMoveId
+  const [learnedMoveMap, setLearnedMoveMap] = useState<Map<string, string>>(new Map())
   const containerRef = useRef<HTMLDivElement>(null)
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const graphRef = useRef<any>(null)
   const [dimensions, setDimensions] = useState({ width: 800, height: 600 })
 
+  // Style & scheme state
+  const [styles, setStyles] = useState<StyleMeta[]>([])
+  const [activeStyle, setActiveStyle] = useState('lindy-hop')
+  const [schemeConfigs, setSchemeConfigs] = useState<Record<string, SchemeConfig>>({})
+  const [activeScheme, setActiveScheme] = useState<string>('hybrid')
+
+  // Load available styles on mount
+  useEffect(() => {
+    fetch('/api/styles').then(r => r.json()).then((data: StyleMeta[]) => {
+      if (Array.isArray(data) && data.length > 0) {
+        setStyles(data)
+      }
+    }).catch(() => {})
+  }, [])
+
   const loadGraph = useCallback(async () => {
     try {
-      const [universalRes, userRes] = await Promise.all([
-        fetch('/api/graph/seed'),
+      const [seedRes, userRes] = await Promise.all([
+        fetch(`/api/graph/seed?style=${activeStyle}`),
         fetch('/api/moves'),
       ])
 
-      const universalMoves: UniversalMove[] = await universalRes.json()
+      const envelope = await seedRes.json()
       const userMoves: UserMove[] = await userRes.json()
 
-      if (!Array.isArray(universalMoves) || universalMoves.length === 0) {
+      // Parse the new envelope format
+      const schemes: Record<string, SchemeConfig> = envelope.schemes || {}
+      const universalMoves: UniversalMove[] = envelope.moves || []
+
+      setSchemeConfigs(schemes)
+
+      // If active scheme isn't in this style's schemes, pick the first one
+      const schemeKeys = Object.keys(schemes)
+      if (schemeKeys.length > 0 && !schemes[activeScheme]) {
+        setActiveScheme(schemeKeys[0])
+      }
+
+      if (universalMoves.length === 0) {
         setGraphData(null)
         return
       }
@@ -214,42 +161,29 @@ export default function GraphPage() {
       }
       setLearnedMoveMap(newLearnedMap)
 
-      // Build a map of move IDs to their names for variation tracking
-      const moveIdToName = new Map<string, string>()
-      const moveNameToId = new Map<string, string>()
-      for (const move of universalMoves) {
-        moveIdToName.set(move.id, move.name)
-        moveNameToId.set(move.name.toLowerCase(), move.id)
-      }
-
-      // Track which nodes are variations and their parents
-      // If move A has relatedMoves: [{ name: "B", type: "variation" }]
-      // It means A is declaring itself as a variation OF B (B is the parent)
-      const variationParents = new Map<string, string>() // variationId -> parentId
+      // Build variation tracking
+      const variationParents = new Map<string, string>()
       for (const move of universalMoves) {
         for (const rel of move.relatedFrom) {
           if (rel.relationType === 'variation') {
-            // This move declared a variation relationship TO rel.toMove
-            // Meaning: THIS MOVE is a variation of rel.toMove
-            // So this move is the variation, rel.toMove is the parent
             variationParents.set(move.id, rel.toMove.id)
           }
         }
-        // Note: We don't need to process relatedTo for variations
-        // because the relationship is defined from the variation's side
       }
 
-      // First pass: create nodes without positions
+      // First pass: create nodes
       const nodesRaw = universalMoves.map(move => {
         const parentId = variationParents.get(move.id)
         return {
           id: move.id,
           name: move.name,
           tier: move.tier,
-          category: (move.category || 'partnered') as 'solo' | 'partnered',
-          family: (move.family || 'core_lindy') as MoveFamily,
-          movementFamily: (move.movementFamily || 'fundamentals') as MovementFamily,
-          positionFrame: (move.positionFrame || 'open') as PositionFrame,
+          category: move.category,
+          classifications: {
+            family: move.family,
+            movementFamily: move.movementFamily,
+            positionFrame: move.positionFrame,
+          },
           description: move.description,
           learned: learnedNames.has(move.name.toLowerCase()),
           isVariation: !!parentId,
@@ -257,61 +191,39 @@ export default function GraphPage() {
         }
       })
 
-      // Build lookup for parent tiers
       const nodeById = new Map(nodesRaw.map(n => [n.id, n]))
 
-      // Second pass: set FIXED x positions based on tier
-      // Using fx (fixed x) locks nodes horizontally while allowing vertical movement
+      // Second pass: set positions
       const width = Math.min(window.innerWidth - 32, 1280 - 32)
       const height = window.innerHeight - 140
       const margin = width * 0.1
       const usableWidth = width * 0.8
 
-      // Group nodes by tier for vertical distribution
-      const tierGroups: Map<number, typeof nodesRaw> = new Map()
-      for (const node of nodesRaw) {
-        let tierForPosition = node.tier
-        if (node.isVariation && node.parentId) {
-          const parent = nodeById.get(node.parentId)
-          if (parent) tierForPosition = Math.max(node.tier, parent.tier + 1)
-        }
-        tierForPosition = Math.min(tierForPosition, 4) // cap at tier 4
-        if (!tierGroups.has(tierForPosition)) {
-          tierGroups.set(tierForPosition, [])
-        }
-        tierGroups.get(tierForPosition)!.push(node)
-      }
+      const currentScheme = schemes[activeScheme] || Object.values(schemes)[0]
 
       const nodes: GraphNode[] = nodesRaw.map((node) => {
         let tierForPosition = node.tier
 
-        // Variations always appear to the RIGHT of their parent
-        // Use the higher of: own tier, or parent tier + 1
         if (node.isVariation && node.parentId) {
           const parent = nodeById.get(node.parentId)
           if (parent) {
             tierForPosition = Math.max(node.tier, parent.tier + 1)
           }
         }
-        tierForPosition = Math.min(tierForPosition, 4) // cap at tier 4
+        tierForPosition = Math.min(tierForPosition, 4)
 
-        // Calculate x position based on tier (1-4 maps to left-right)
-        const tierPosition = (tierForPosition - 1) / 3 // 0 to 1
+        const tierPosition = (tierForPosition - 1) / 3
         const baseX = margin + tierPosition * usableWidth
-
-        // Add small offset for variations to separate from non-variation nodes at same tier
         const xOffset = node.isVariation ? 30 : 0
 
-        // Calculate Y position based on active categorization scheme
-        const scheme = schemeConfigs[activeScheme]
-        const nodeGroupKey = node[scheme.nodeKey] as string
-        const groupY = (scheme.positions[nodeGroupKey] ?? 0.5) * height
-        // Add some randomness within family band
+        // Y position based on active scheme
+        const nodeGroupKey = node.classifications[currentScheme.nodeKey]
+        const group = currentScheme.groups[nodeGroupKey]
+        const groupY = (group?.position ?? 0.5) * height
         const baseY = groupY + (Math.random() - 0.5) * (height * 0.15)
 
         return {
           ...node,
-          // Set initial positions (NOT fixed - allow movement)
           x: baseX + xOffset + (Math.random() - 0.5) * 40,
           y: baseY,
         } as GraphNode
@@ -341,13 +253,13 @@ export default function GraphPage() {
     } finally {
       setLoading(false)
     }
-  }, [activeScheme])
+  }, [activeStyle, activeScheme])
 
   const seedGraph = async () => {
     setSeeding(true)
     setError(null)
     try {
-      const res = await fetch('/api/graph/seed', { method: 'POST' })
+      const res = await fetch(`/api/graph/seed?style=${activeStyle}`, { method: 'POST' })
       const data = await res.json()
       if (data.success) {
         await loadGraph()
@@ -367,9 +279,7 @@ export default function GraphPage() {
 
   useEffect(() => {
     const updateDimensions = () => {
-      // Calculate available width: min of window width or max-w-7xl (1280px), minus padding
       const maxWidth = Math.min(window.innerWidth - 32, 1280 - 32)
-      // Calculate available height: viewport minus header, nav, and padding
       const availableHeight = window.innerHeight - 140
 
       setDimensions({
@@ -383,47 +293,37 @@ export default function GraphPage() {
     return () => window.removeEventListener('resize', updateDimensions)
   }, [])
 
-  // Configure forces for tier-based horizontal layout with relationship blending
+  // Configure forces
   useEffect(() => {
-    if (!graphData) return
+    if (!graphData || Object.keys(schemeConfigs).length === 0) return
 
-    // Wait for the graph component to be ready
     const applyForces = () => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const fg = graphRef.current as any
       if (!fg || typeof fg.d3Force !== 'function') {
-        // Retry if not ready yet
         setTimeout(applyForces, 100)
         return
       }
 
-      // Build a map for quick parent lookup
       const nodeById = new Map(graphData.nodes.map(n => [n.id, n]))
 
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       import('d3-force-3d').then((d3: any) => {
-        // Remove default center force - our custom X/Y forces handle positioning
         fg.d3Force('center', null)
 
         const margin = dimensions.width * 0.1
         const usableWidth = dimensions.width * 0.8
 
-        // Create a forceX that biases nodes toward their tier position
-        // Variations always to the RIGHT of their parent
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const tierForce = d3.forceX((node: any) => {
           let tierToUse = node.tier
-
-          // Variations: use the higher of own tier or parent tier + 1
           if (node.isVariation && node.parentId) {
             const parent = nodeById.get(node.parentId)
             if (parent) {
               tierToUse = Math.min(4, Math.max(node.tier, parent.tier + 1))
             }
           }
-
           const tierPosition = (tierToUse - 1) / 3
-          // Small additional offset for variations to separate from same-tier non-variations
           const variationOffset = node.isVariation ? 30 : 0
           return margin + tierPosition * usableWidth + variationOffset
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -432,27 +332,22 @@ export default function GraphPage() {
         )
 
         fg.d3Force('x', tierForce)
-
-        // Charge force for repulsion/spreading
         fg.d3Force('charge', d3.forceManyBody().strength(forceParams.chargeStrength))
 
-        // Y force: pull nodes toward their group's Y position based on active scheme
-        const scheme = schemeConfigs[activeScheme]
+        const currentScheme = schemeConfigs[activeScheme] || Object.values(schemeConfigs)[0]
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const groupForce = d3.forceY((node: any) => {
-          const groupKey = node[scheme.nodeKey] as string
-          return (scheme.positions[groupKey] ?? 0.5) * dimensions.height
+          const groupKey = node.classifications[currentScheme.nodeKey]
+          const group = currentScheme.groups[groupKey]
+          return (group?.position ?? 0.5) * dimensions.height
         }).strength(forceParams.familyStrength)
         fg.d3Force('y', groupForce)
 
-        // Link force pulls connected nodes together
         const linkForce = fg.d3Force('link')
         if (linkForce) {
           linkForce.distance(forceParams.linkDistance).strength(forceParams.linkStrength)
         }
 
-        // Custom force: keep variations to the RIGHT of their parent
-        // This runs each tick and pushes variations right if they drift left of parent
         const variationNodes = graphData.nodes.filter(n => n.isVariation && n.parentId)
         fg.d3Force('variationRight', () => {
           for (const node of variationNodes) {
@@ -462,36 +357,34 @@ export default function GraphPage() {
             if (parent) {
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               const parentAny = parent as any
-              // If variation is left of or too close to parent, push it right
               if (nodeAny.x !== undefined && parentAny.x !== undefined) {
-                const minOffset = 40 // Minimum distance to the right
+                const minOffset = 40
                 if (nodeAny.x < parentAny.x + minOffset) {
-                  nodeAny.vx = (nodeAny.vx || 0) + 3 // Push right
+                  nodeAny.vx = (nodeAny.vx || 0) + 3
                 }
               }
             }
           }
         })
 
-        // Reheat to apply new forces
         fg.d3ReheatSimulation()
       })
     }
 
-    // Start trying to apply forces after a short delay
     const timer = setTimeout(applyForces, 200)
     return () => clearTimeout(timer)
-  }, [graphData, dimensions, forceParams, activeScheme])
+  }, [graphData, dimensions, forceParams, activeScheme, schemeConfigs])
 
-  // Color by active categorization scheme, with lighter shade if not learned
+  // Color by active scheme
   const getNodeColor = useCallback((node: GraphNode) => {
-    const scheme = schemeConfigs[activeScheme]
-    const groupKey = node[scheme.nodeKey] as string
-    const colors = scheme.colors[groupKey] || Object.values(scheme.colors)[0]
-    return node.learned ? colors.base : colors.light
-  }, [activeScheme])
+    const currentScheme = schemeConfigs[activeScheme] || Object.values(schemeConfigs)[0]
+    if (!currentScheme) return node.learned ? '#3b82f6' : '#93c5fd'
+    const groupKey = node.classifications[currentScheme.nodeKey]
+    const group = currentScheme.groups[groupKey] || Object.values(currentScheme.groups)[0]
+    return node.learned ? group.color.base : group.color.light
+  }, [activeScheme, schemeConfigs])
 
-  // Draw tier (X-axis) and category (Y-axis) labels on the canvas so they move with pan/zoom
+  // Draw axis labels
   const tierLabels = [
     { tier: 1, label: 'Tier 1: Fundamentals' },
     { tier: 2, label: 'Tier 2: Basics' },
@@ -500,26 +393,25 @@ export default function GraphPage() {
   ]
 
   const drawAxisLabels = useCallback((ctx: CanvasRenderingContext2D, globalScale: number) => {
-    if (!graphData) return
+    if (!graphData || Object.keys(schemeConfigs).length === 0) return
 
     const width = dimensions.width
     const height = dimensions.height
     const margin = width * 0.1
     const usableWidth = width * 0.8
-    const scheme = schemeConfigs[activeScheme]
+    const currentScheme = schemeConfigs[activeScheme] || Object.values(schemeConfigs)[0]
+    if (!currentScheme) return
 
-    // Font size that stays readable as you zoom (shrinks in world coords as you zoom in)
     const fontSize = Math.max(10, 14 / globalScale)
     const largeFontSize = Math.max(12, 16 / globalScale)
 
-    // --- Tier labels along the X-axis (below the node area) ---
+    // Tier labels along X-axis
     ctx.textAlign = 'center'
     ctx.textBaseline = 'top'
-    const tierLabelY = height * 1.02 // below the lowest band (0.9 * height)
+    const tierLabelY = height * 1.02
     for (const { tier, label } of tierLabels) {
       const tierX = margin + ((tier - 1) / 3) * usableWidth
 
-      // Background pill
       ctx.font = `${fontSize}px Sans-Serif`
       const textWidth = ctx.measureText(label).width
       const padding = 6 / globalScale
@@ -533,24 +425,22 @@ export default function GraphPage() {
       ctx.roundRect(rx, ry, rw, rh, radius)
       ctx.fill()
 
-      // Text
       ctx.fillStyle = 'rgba(156, 163, 175, 0.9)'
       ctx.fillText(label, tierX, tierLabelY)
     }
 
-    // --- Category band labels along the Y-axis (left of the node area) ---
+    // Group band labels along Y-axis
     ctx.textAlign = 'right'
     ctx.textBaseline = 'middle'
     ctx.font = `bold ${largeFontSize}px Sans-Serif`
 
-    const labelX = margin - 15 // to the left of where Tier 1 nodes sit
+    const labelX = margin - 15
 
-    for (const [key, yFraction] of Object.entries(scheme.positions)) {
-      const labelY = yFraction * height
-      const label = scheme.labels[key] || key
-      const color = scheme.colors[key]?.base || '#9ca3af'
+    for (const [key, group] of Object.entries(currentScheme.groups)) {
+      const labelY = group.position * height
+      const label = group.label || key
+      const color = group.color?.base || '#9ca3af'
 
-      // Background pill
       const textWidth = ctx.measureText(label).width
       const padding = 6 / globalScale
       ctx.fillStyle = 'rgba(31, 41, 55, 0.85)'
@@ -565,11 +455,10 @@ export default function GraphPage() {
       )
       ctx.fill()
 
-      // Colored text
       ctx.fillStyle = color
       ctx.fillText(label, labelX, labelY)
     }
-  }, [graphData, dimensions, activeScheme])
+  }, [graphData, dimensions, activeScheme, schemeConfigs])
 
   if (loading) {
     return (
@@ -595,8 +484,21 @@ export default function GraphPage() {
           </div>
           <h2 className="text-lg font-semibold text-gray-900 mb-2">Build the Move Universe</h2>
           <p className="text-gray-600 max-w-sm mx-auto mb-6">
-            Generate a graph of Lindy Hop moves and their relationships.
+            Generate a graph of dance moves and their relationships.
           </p>
+          {styles.length > 1 && (
+            <div className="mb-4">
+              <select
+                value={activeStyle}
+                onChange={(e) => setActiveStyle(e.target.value)}
+                className="border border-gray-300 rounded-lg px-3 py-2 text-sm"
+              >
+                {styles.map(s => (
+                  <option key={s.slug} value={s.slug}>{s.name} ({s.moveCount} moves)</option>
+                ))}
+              </select>
+            </div>
+          )}
           {error && (
             <p className="text-red-600 mb-4">{error}</p>
           )}
@@ -613,10 +515,12 @@ export default function GraphPage() {
   }
 
   const learnedCount = graphData.nodes.filter(n => n.learned).length
-  const scheme = schemeConfigs[activeScheme]
+  const currentScheme = schemeConfigs[activeScheme] || Object.values(schemeConfigs)[0]
   const groupCounts: Record<string, number> = {}
-  for (const key of Object.keys(scheme.labels)) {
-    groupCounts[key] = graphData.nodes.filter(n => (n[scheme.nodeKey] as string) === key).length
+  if (currentScheme) {
+    for (const key of Object.keys(currentScheme.groups)) {
+      groupCounts[key] = graphData.nodes.filter(n => n.classifications[currentScheme.nodeKey] === key).length
+    }
   }
 
   return (
@@ -669,10 +573,26 @@ export default function GraphPage() {
         >
           {/* Legend overlay with scheme switcher */}
           <div className="absolute top-4 left-4 bg-gray-800/90 backdrop-blur-sm rounded-lg p-3 z-10 text-sm">
+            {/* Style selector (only if multiple styles) */}
+            {styles.length > 1 && (
+              <>
+                <div className="text-white font-medium mb-1">Dance Style</div>
+                <select
+                  value={activeStyle}
+                  onChange={(e) => { setActiveStyle(e.target.value); setLoading(true) }}
+                  className="w-full bg-gray-700 text-white text-xs rounded px-2 py-1 mb-2"
+                >
+                  {styles.map(s => (
+                    <option key={s.slug} value={s.slug}>{s.name}</option>
+                  ))}
+                </select>
+                <div className="border-t border-gray-600 my-2"></div>
+              </>
+            )}
             {/* Radio button scheme switcher */}
             <div className="text-white font-medium mb-2">View By</div>
             <div className="space-y-1 mb-3">
-              {(Object.keys(schemeConfigs) as CategorizationScheme[]).map((key) => (
+              {Object.entries(schemeConfigs).map(([key, scheme]) => (
                 <label key={key} className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="radio"
@@ -683,22 +603,24 @@ export default function GraphPage() {
                     className="accent-indigo-500"
                   />
                   <span className={`text-xs ${activeScheme === key ? 'text-white' : 'text-gray-400'}`}>
-                    {schemeConfigs[key].label}
-                    <span className="text-gray-500 ml-1">({schemeConfigs[key].description})</span>
+                    {scheme.label}
+                    <span className="text-gray-500 ml-1">({scheme.description})</span>
                   </span>
                 </label>
               ))}
             </div>
             <div className="border-t border-gray-600 my-2"></div>
             {/* Dynamic legend based on active scheme */}
-            <div className="space-y-1.5">
-              {Object.entries(scheme.labels).map(([key, label]) => (
-                <div key={key} className="flex items-center gap-2">
-                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: scheme.colors[key].base }}></div>
-                  <span className="text-gray-300 text-xs">{label} ({groupCounts[key] || 0})</span>
-                </div>
-              ))}
-            </div>
+            {currentScheme && (
+              <div className="space-y-1.5">
+                {Object.entries(currentScheme.groups).map(([key, group]) => (
+                  <div key={key} className="flex items-center gap-2">
+                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: group.color.base }}></div>
+                    <span className="text-gray-300 text-xs">{group.label} ({groupCounts[key] || 0})</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="border-t border-gray-600 my-2"></div>
             <div className="space-y-1.5">
               <div className="flex items-center gap-2">
@@ -872,7 +794,6 @@ export default function GraphPage() {
               // Toggle learned status
               const key = n.name.toLowerCase()
               if (n.learned) {
-                // Unmark: delete the user move
                 const userMoveId = learnedMoveMap.get(key)
                 if (userMoveId) {
                   try {
@@ -881,7 +802,6 @@ export default function GraphPage() {
                   } catch { return }
                 }
               } else {
-                // Mark as learned: create a user move
                 try {
                   const res = await fetch('/api/moves', {
                     method: 'POST',
@@ -894,7 +814,6 @@ export default function GraphPage() {
                   }
                 } catch { return }
               }
-              // Mutate in place to preserve d3 simulation positions, then trigger re-render
               n.learned = !n.learned
               setGraphData(prev => prev ? { ...prev } : prev)
             }}
@@ -903,7 +822,6 @@ export default function GraphPage() {
             nodeCanvasObjectMode={() => 'after'}
             nodeCanvasObject={(node, ctx, globalScale) => {
               const n = node as GraphNode & { x: number; y: number }
-              // Only show labels when zoomed in enough
               if (globalScale < 0.5) return
 
               const label = n.name
