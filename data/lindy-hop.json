@@ -183,11 +183,6 @@
           "name": "Rock Step",
           "weight": 0.9,
           "type": "related"
-        },
-        {
-          "name": "Kick Ball Change",
-          "weight": 0.8,
-          "type": "variation"
         }
       ]
     },
@@ -435,11 +430,6 @@
           "name": "Basic Charleston",
           "weight": 0.6,
           "type": "related"
-        },
-        {
-          "name": "Strut",
-          "weight": 0.8,
-          "type": "variation"
         }
       ]
     },
@@ -500,16 +490,6 @@
           "name": "Lindy Circle",
           "weight": 0.8,
           "type": "leads_to"
-        },
-        {
-          "name": "Savoy Swingout",
-          "weight": 0.7,
-          "type": "variation"
-        },
-        {
-          "name": "Hollywood Swingout",
-          "weight": 0.7,
-          "type": "variation"
         }
       ]
     },
@@ -870,11 +850,6 @@
           "name": "Boogie Forward",
           "weight": 0.9,
           "type": "related"
-        },
-        {
-          "name": "Boogie Drop",
-          "weight": 0.7,
-          "type": "variation"
         }
       ]
     },
@@ -910,7 +885,7 @@
         {
           "name": "Triple Step",
           "weight": 0.8,
-          "type": "related"
+          "type": "variation"
         },
         {
           "name": "Apple Jacks",
@@ -962,11 +937,6 @@
           "type": "prerequisite"
         },
         {
-          "name": "Texas Tommy Reverse",
-          "weight": 0.8,
-          "type": "variation"
-        },
-        {
           "name": "Hammerlock",
           "weight": 0.7,
           "type": "leads_to"
@@ -998,11 +968,6 @@
           "name": "Free Spin",
           "weight": 0.6,
           "type": "leads_to"
-        },
-        {
-          "name": "Double Inside Turn",
-          "weight": 0.7,
-          "type": "variation"
         }
       ]
     },
@@ -1026,11 +991,6 @@
           "name": "Inside Turn",
           "weight": 0.8,
           "type": "related"
-        },
-        {
-          "name": "Double Outside Turn",
-          "weight": 0.7,
-          "type": "variation"
         }
       ]
     },
@@ -1075,11 +1035,6 @@
           "name": "Swingout from Closed",
           "weight": 0.9,
           "type": "prerequisite"
-        },
-        {
-          "name": "Swingout with Double Kick",
-          "weight": 0.7,
-          "type": "variation"
         }
       ]
     },
@@ -1301,11 +1256,6 @@
           "name": "Hand-to-Hand Charleston",
           "weight": 0.8,
           "type": "prerequisite"
-        },
-        {
-          "name": "Hand-to-Hand Cross Kicks",
-          "weight": 0.9,
-          "type": "variation"
         }
       ]
     },
@@ -1342,16 +1292,6 @@
           "name": "Basic Charleston",
           "weight": 0.8,
           "type": "prerequisite"
-        },
-        {
-          "name": "Skip Up with Flare",
-          "weight": 0.8,
-          "type": "variation"
-        },
-        {
-          "name": "Long Skip Up",
-          "weight": 0.7,
-          "type": "variation"
         }
       ]
     },
@@ -1565,11 +1505,6 @@
           "name": "Swingout from Closed",
           "weight": 0.7,
           "type": "related"
-        },
-        {
-          "name": "Pecks with Spin",
-          "weight": 0.8,
-          "type": "variation"
         }
       ]
     },
@@ -1632,11 +1567,6 @@
           "name": "Switches",
           "weight": 0.6,
           "type": "leads_to"
-        },
-        {
-          "name": "Swivel Walks",
-          "weight": 0.8,
-          "type": "variation"
         }
       ]
     },
@@ -1814,11 +1744,6 @@
           "name": "Strut",
           "weight": 0.7,
           "type": "related"
-        },
-        {
-          "name": "Camel Walk Backward",
-          "weight": 0.8,
-          "type": "variation"
         }
       ]
     },
@@ -2377,11 +2302,6 @@
           "name": "Send Out",
           "weight": 0.9,
           "type": "prerequisite"
-        },
-        {
-          "name": "Cross-Body Inside Turn Sendout",
-          "weight": 0.8,
-          "type": "variation"
         }
       ]
     },
@@ -2696,13 +2616,7 @@
         "movementFamily": "swingout",
         "positionFrame": "open"
       },
-      "relationships": [
-        {
-          "name": "Double Foot Sweep",
-          "weight": 0.9,
-          "type": "variation"
-        }
-      ]
+      "relationships": []
     },
     {
       "name": "Double Foot Sweep",
@@ -2921,11 +2835,6 @@
           "name": "Tranky Doo",
           "weight": 0.9,
           "type": "related"
-        },
-        {
-          "name": "Extreme Fall Off the Log",
-          "weight": 0.8,
-          "type": "variation"
         }
       ]
     },

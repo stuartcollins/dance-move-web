@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import dynamic from 'next/dynamic'
 import { AppShell } from '@/components/AppShell'
 
@@ -117,6 +117,13 @@ export default function GraphPage() {
   const [activeStyle, setActiveStyle] = useState('lindy-hop')
   const [schemeConfigs, setSchemeConfigs] = useState<Record<string, SchemeConfig>>({})
   const [activeScheme, setActiveScheme] = useState<string>('hybrid')
+
+  // Relationship type filter — 'all' or a single type
+  const relTypes = ['prerequisite', 'variation', 'leads_to', 'related'] as const
+  const [activeRelFilter, setActiveRelFilter] = useState<string>('all')
+
+  // Hover highlight state
+  const [hoveredNode, setHoveredNode] = useState<GraphNode | null>(null)
 
   // Load available styles on mount
   useEffect(() => {
@@ -237,11 +244,17 @@ export default function GraphPage() {
           const key = [move.id, rel.toMove.id].sort().join('-')
           if (!linkSet.has(key)) {
             linkSet.add(key)
+            const type = rel.relationType || 'related'
+            // Prerequisite and variation are stored child→parent in the data.
+            // Swap source/target so arrows point parent→child for readability:
+            //   prerequisite: simpler move → advanced move
+            //   variation: parent move → variant
+            const flip = type === 'prerequisite' || type === 'variation'
             links.push({
-              source: move.id,
-              target: rel.toMove.id,
+              source: flip ? rel.toMove.id : move.id,
+              target: flip ? move.id : rel.toMove.id,
               weight: rel.weight,
-              relationType: rel.relationType || 'related',
+              relationType: type,
             })
           }
         }
@@ -333,19 +346,27 @@ export default function GraphPage() {
 
         fg.d3Force('x', tierForce)
         fg.d3Force('charge', d3.forceManyBody().strength(forceParams.chargeStrength))
+        fg.d3Force('collide', null)
 
         const currentScheme = schemeConfigs[activeScheme] || Object.values(schemeConfigs)[0]
+        // When filtering to a single relationship type, weaken the group band force
+        // and strengthen links so connected nodes cluster together (reduces crossings)
+        const isFiltered = activeRelFilter !== 'all'
+        const groupStrength = forceParams.familyStrength
+        const linkStr = forceParams.linkStrength
+        const linkDist = forceParams.linkDistance
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const groupForce = d3.forceY((node: any) => {
           const groupKey = node.classifications[currentScheme.nodeKey]
           const group = currentScheme.groups[groupKey]
           return (group?.position ?? 0.5) * dimensions.height
-        }).strength(forceParams.familyStrength)
+        }).strength(groupStrength)
         fg.d3Force('y', groupForce)
 
         const linkForce = fg.d3Force('link')
         if (linkForce) {
-          linkForce.distance(forceParams.linkDistance).strength(forceParams.linkStrength)
+          linkForce.distance(linkDist).strength(linkStr)
         }
 
         const variationNodes = graphData.nodes.filter(n => n.isVariation && n.parentId)
@@ -367,13 +388,71 @@ export default function GraphPage() {
           }
         })
 
+        // Custom force: spread siblings (nodes sharing a link target) apart vertically.
+        // Only active when filtering to a single relationship type.
+        if (isFiltered) {
+          // Build sibling groups from the filtered links
+          const filteredLinks = graphData.links.filter(l => l.relationType === activeRelFilter)
+          const parentToChildren = new Map<string, string[]>()
+          for (const link of filteredLinks) {
+            const src = typeof link.source === 'object' ? (link.source as GraphNode).id : link.source
+            const tgt = typeof link.target === 'object' ? (link.target as GraphNode).id : link.target
+            // Group by source (parent side) — children are the targets
+            if (!parentToChildren.has(src)) parentToChildren.set(src, [])
+            parentToChildren.get(src)!.push(tgt)
+          }
+
+          fg.d3Force('spreadSiblings', () => {
+            const minGap = 40
+            for (const [, children] of parentToChildren) {
+              if (children.length < 2) continue
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const childNodes = children.map(id => nodeById.get(id)).filter(Boolean) as any[]
+              // Sort by current Y position
+              childNodes.sort((a: { y?: number }, b: { y?: number }) => (a.y ?? 0) - (b.y ?? 0))
+              // Push apart if too close
+              for (let i = 0; i < childNodes.length - 1; i++) {
+                const a = childNodes[i]
+                const b = childNodes[i + 1]
+                if (a.y !== undefined && b.y !== undefined) {
+                  const gap = b.y - a.y
+                  if (gap < minGap) {
+                    const push = (minGap - gap) * 0.3
+                    a.vy = (a.vy || 0) - push
+                    b.vy = (b.vy || 0) + push
+                  }
+                }
+              }
+            }
+          })
+
+          // Pull children toward their parent's Y position to reduce line crossings
+          fg.d3Force('parentYPull', () => {
+            for (const [parentId, children] of parentToChildren) {
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              const parentNode = nodeById.get(parentId) as any
+              if (!parentNode || parentNode.y === undefined) continue
+              for (const childId of children) {
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const childNode = nodeById.get(childId) as any
+                if (!childNode || childNode.y === undefined) continue
+                const dy = parentNode.y - childNode.y
+                childNode.vy = (childNode.vy || 0) + dy * 0.03
+              }
+            }
+          })
+        } else {
+          fg.d3Force('spreadSiblings', null)
+          fg.d3Force('parentYPull', null)
+        }
+
         fg.d3ReheatSimulation()
       })
     }
 
     const timer = setTimeout(applyForces, 200)
     return () => clearTimeout(timer)
-  }, [graphData, dimensions, forceParams, activeScheme, schemeConfigs])
+  }, [graphData, dimensions, forceParams, activeScheme, schemeConfigs, activeRelFilter])
 
   // Color by active scheme
   const getNodeColor = useCallback((node: GraphNode) => {
@@ -460,6 +539,35 @@ export default function GraphPage() {
     }
   }, [graphData, dimensions, activeScheme, schemeConfigs])
 
+  // Filter links by active relationship type (computed before early returns to keep hook order stable)
+  const filteredLinks = useMemo(() => {
+    if (!graphData) return []
+    return activeRelFilter === 'all'
+      ? graphData.links
+      : graphData.links.filter(l => l.relationType === activeRelFilter)
+  }, [graphData, activeRelFilter])
+
+  // Compute set of nodes connected to hovered node
+  const hoveredConnected = useMemo(() => {
+    if (!hoveredNode) return null
+    const connected = new Set<string>()
+    connected.add(hoveredNode.id)
+    for (const link of filteredLinks) {
+      const src = typeof link.source === 'object' ? (link.source as GraphNode).id : link.source
+      const tgt = typeof link.target === 'object' ? (link.target as GraphNode).id : link.target
+      if (src === hoveredNode.id) connected.add(tgt as string)
+      if (tgt === hoveredNode.id) connected.add(src as string)
+    }
+    return connected
+  }, [hoveredNode, filteredLinks])
+
+  // Memoize filteredGraphData so hover state changes don't create a new reference
+  // (which would cause react-force-graph-2d to reheat the simulation)
+  const filteredGraphData = useMemo<GraphData | null>(() => {
+    if (!graphData) return null
+    return { nodes: graphData.nodes, links: filteredLinks }
+  }, [graphData, filteredLinks])
+
   if (loading) {
     return (
       <AppShell title="Move Graph" fullWidth>
@@ -512,6 +620,14 @@ export default function GraphPage() {
         </div>
       </AppShell>
     )
+  }
+
+  // Relationship type display config
+  const relTypeConfig: Record<string, { label: string; color: string; dash: number[] | null }> = {
+    prerequisite: { label: 'Prerequisite', color: '#60a5fa', dash: null },
+    variation: { label: 'Variation', color: '#fb923c', dash: [4, 2] },
+    leads_to: { label: 'Leads To', color: '#34d399', dash: null },
+    related: { label: 'Related', color: 'rgba(255,255,255,0.25)', dash: null },
   }
 
   const learnedCount = graphData.nodes.filter(n => n.learned).length
@@ -631,22 +747,52 @@ export default function GraphPage() {
                 <div className="w-3 h-3 rounded-full border-2 border-gray-500"></div>
                 <span className="text-gray-300 text-xs">Not learned ({graphData.nodes.length - learnedCount})</span>
               </div>
-              <div className="border-t border-gray-600 my-2"></div>
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-0.5 bg-white"></div>
-                <span className="text-gray-300 text-xs">Related</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-6 h-0.5 bg-orange-400" style={{ backgroundImage: 'repeating-linear-gradient(90deg, #fb923c 0, #fb923c 3px, transparent 3px, transparent 6px)' }}></div>
-                <span className="text-gray-300 text-xs">Variation</span>
-              </div>
+            </div>
+            <div className="border-t border-gray-600 my-2"></div>
+            {/* Relationship type filter */}
+            <div className="text-white font-medium mb-1.5">Relationships</div>
+            <div className="space-y-1">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input
+                  type="radio"
+                  name="relType"
+                  checked={activeRelFilter === 'all'}
+                  onChange={() => setActiveRelFilter('all')}
+                  className="accent-indigo-500"
+                />
+                <span className={`text-xs ${activeRelFilter === 'all' ? 'text-white' : 'text-gray-400'}`}>
+                  All ({graphData.links.length})
+                </span>
+              </label>
+              {relTypes.map(type => {
+                const config = relTypeConfig[type]
+                const count = graphData.links.filter(l => l.relationType === type).length
+                return (
+                  <label key={type} className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="relType"
+                      checked={activeRelFilter === type}
+                      onChange={() => setActiveRelFilter(type)}
+                      className="accent-indigo-500"
+                    />
+                    <div className="w-4 h-0.5 flex-shrink-0" style={{
+                      backgroundColor: config.color,
+                      ...(config.dash ? { backgroundImage: `repeating-linear-gradient(90deg, ${config.color} 0, ${config.color} 3px, transparent 3px, transparent 6px)` } : {}),
+                    }}></div>
+                    <span className={`text-xs ${activeRelFilter === type ? 'text-white' : 'text-gray-400'}`}>
+                      {config.label} ({count})
+                    </span>
+                  </label>
+                )
+              })}
             </div>
           </div>
 
           {/* Stats overlay */}
           <div className="absolute top-4 right-4 bg-gray-800/90 backdrop-blur-sm rounded-lg p-3 z-10 text-sm">
             <div className="text-white font-medium">{graphData.nodes.length} moves</div>
-            <div className="text-gray-400 text-xs">{graphData.links.length} connections</div>
+            <div className="text-gray-400 text-xs">{filteredGraphData!.links.length} connections</div>
             <button
               onClick={() => setMarkingMode(m => !m)}
               className={`mt-2 w-full text-xs py-1.5 px-3 rounded font-medium transition-colors ${
@@ -766,24 +912,60 @@ export default function GraphPage() {
 
           <ForceGraph2D
             ref={graphRef}
-            graphData={graphData}
+            graphData={filteredGraphData!}
             width={dimensions.width}
             height={dimensions.height}
             nodeLabel={(node) => {
               const n = node as GraphNode
               return `${n.name} (${n.category})`
             }}
-            nodeColor={(node) => getNodeColor(node as GraphNode)}
+            nodeColor={(node) => {
+              const n = node as GraphNode
+              if (hoveredConnected && !hoveredConnected.has(n.id)) {
+                return 'rgba(100,100,100,0.15)'
+              }
+              return getNodeColor(n)
+            }}
             nodeRelSize={5}
             nodeVal={1}
-            linkWidth={(link) => (link as GraphLink).weight * 2}
+            linkWidth={(link) => {
+              const l = link as GraphLink
+              if (hoveredConnected) {
+                const src = typeof l.source === 'object' ? (l.source as GraphNode).id : l.source
+                const tgt = typeof l.target === 'object' ? (l.target as GraphNode).id : l.target
+                if (!hoveredConnected.has(src as string) || !hoveredConnected.has(tgt as string)) {
+                  return 0.3
+                }
+              }
+              return l.weight * 2
+            }}
             linkColor={(link) => {
               const l = link as GraphLink
-              return l.relationType === 'variation' ? '#fb923c' : 'rgba(255,255,255,0.15)'
+              if (hoveredConnected) {
+                const src = typeof l.source === 'object' ? (l.source as GraphNode).id : l.source
+                const tgt = typeof l.target === 'object' ? (l.target as GraphNode).id : l.target
+                if (!hoveredConnected.has(src as string) || !hoveredConnected.has(tgt as string)) {
+                  return 'rgba(255,255,255,0.03)'
+                }
+              }
+              return relTypeConfig[l.relationType]?.color || 'rgba(255,255,255,0.15)'
             }}
+            linkCurvature={0.15}
             linkLineDash={(link) => {
               const l = link as GraphLink
-              return l.relationType === 'variation' ? [4, 2] : null
+              return relTypeConfig[l.relationType]?.dash || null
+            }}
+            linkDirectionalArrowLength={(link) => {
+              const l = link as GraphLink
+              return l.relationType === 'related' ? 0 : 12
+            }}
+            linkDirectionalArrowRelPos={0.9}
+            linkDirectionalArrowColor={(link) => {
+              const l = link as GraphLink
+              return relTypeConfig[l.relationType]?.color || 'rgba(255,255,255,0.15)'
+            }}
+            onNodeHover={(node) => {
+              setHoveredNode(node ? node as GraphNode : null)
             }}
             onNodeClick={async (node) => {
               const n = node as GraphNode
@@ -829,7 +1011,8 @@ export default function GraphPage() {
               ctx.font = `${fontSize}px Sans-Serif`
               ctx.textAlign = 'center'
               ctx.textBaseline = 'middle'
-              ctx.fillStyle = n.learned ? '#fff' : 'rgba(255,255,255,0.5)'
+              const dimmed = hoveredConnected && !hoveredConnected.has(n.id)
+              ctx.fillStyle = dimmed ? 'rgba(255,255,255,0.08)' : (n.learned ? '#fff' : 'rgba(255,255,255,0.5)')
               ctx.fillText(label, n.x, n.y + 8 + (n.learned ? 2 : 0))
             }}
             cooldownTicks={100}
